@@ -33,7 +33,7 @@ CREATE TABLE #AllData
 , Notes varchar(max)
 , ModStatus varchar(25)
 , Show varchar(5)
-
+, ProjectCostCodeID int
 )
 
 /******************************************************************************/
@@ -100,4 +100,4 @@ SET NOCOUNT OFF
 
 
 
-GO
+
