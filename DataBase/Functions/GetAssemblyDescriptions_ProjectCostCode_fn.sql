@@ -22,23 +22,46 @@ DECLARE @ProjectCostCodeID  int
 
 
 
+DECLARE @ProjectCostCodes TABLE(
+    ProjectCostCodeID int noT NULL,
+    WorkOrderID varchar(7) NOT NULL,
+	CostCodeNumber varchar(15),
+	CostCodeName varchar(1000),
+	CostCodeUniqueID int 
+);
+
+INSERT INTO @ProjectCostCodes (ProjectCostCodeID, WorkOrderID, CostCodeNumber, CostCodeName, CostCodeUniqueID) 
+SELECT 
+	pcc.ProjectCostCodeID, 
+	pcc.WorkOrderID,
+	pcc.CostCodeNumber,
+	pcc.CostCodeName, 
+	pcc.CostCodeUniqueID
+FROM dbo.ProjectCostCodes pcc	
+WHERE pcc.WorkOrderID = @workorderid
+	AND pcc.Status	= 'on'
+
+
+	
+
 SELECT @CostCodeUniqueId = ISNULL(
 									(
 										SELECT CostCodeUniqueId FROM dbo.CostCode cc	
 										WHERE cc.CostCodeID	=  @assemblynumber), 
 									(	SELECT CostCodeUniqueId 
-										FROM dbo.ProjectCostCodes pcc 
+										FROM @ProjectCostCodes pcc 
 										WHERE pcc.WorkOrderID = @workorderid AND pcc.CostCodeNumber	= @assemblynumber)
 								)
 
 
 
 IF EXISTS (
-	SELECT TOP 1 x.*
+	SELECT TOP 1 x.AdjustCostCodeDesc
 	FROM (
-		select isnull(pcc.CostCodeName,adj.AdjustCostCodeDesc) AdjustCostCodeDesc
+		--select isnull(pcc.CostCodeName,adj.AdjustCostCodeDesc) AdjustCostCodeDesc
+		select pcc.CostCodeName AdjustCostCodeDesc
 		from Adjustments adj
-		LEFT JOIN dbo.ProjectCostCodes pcc	ON adj.ProjectCostCodeID = pcc.ProjectCostCodeID	AND pcc.Status	= 'on'
+		INNER JOIN @ProjectCostCodes pcc	ON adj.ProjectCostCodeID = pcc.ProjectCostCodeID	--AND pcc.Status	= 'on'
 		where adj.workorderid = @workorderid
 		and pcc.CostCodeUniqueID	= @CostCodeUniqueID
 		and not isnull(adj.AdjustCostCodeDesc,'') = ''
@@ -46,9 +69,10 @@ IF EXISTS (
 )
 BEGIN
 	select @Str = (
-		select top 1 isnull(pcc.CostCodeName,adj.AdjustCostCodeDesc) AdjustCostCodeDesc
+		--select top 1 isnull(pcc.CostCodeName,adj.AdjustCostCodeDesc) AdjustCostCodeDesc
+		select top 1 pcc.CostCodeName AdjustCostCodeDesc
 		from Adjustments adj
-		LEFT JOIN dbo.ProjectCostCodes pcc	ON adj.ProjectCostCodeID = pcc.ProjectCostCodeID	AND pcc.Status	= 'on'
+		INNER JOIN @ProjectCostCodes pcc	ON adj.ProjectCostCodeID = pcc.ProjectCostCodeID	--AND pcc.Status	= 'on'
 		where adj.workorderid = @workorderid
 		and pcc.CostCodeUniqueID	= @CostCodeUniqueID
 		and not isnull(adj.AdjustCostCodeDesc,'') = ''
@@ -58,12 +82,13 @@ END
 ELSE
 
 IF EXISTS (
-	SELECT TOP 1 x.* 
+	SELECT TOP 1 x.AssemblyDescription
 	FROM (
-		SELECT  IIF(woa.AssemblyMod = '00', ISNULL(pcc.CostCodeName,woa.AssemblyDescription) , woa.AssemblyDescription) AssemblyDescription
+		--SELECT  IIF(woa.AssemblyMod = '00', ISNULL(pcc.CostCodeName,woa.AssemblyDescription) , woa.AssemblyDescription) AssemblyDescription
+		SELECT  IIF(woa.AssemblyMod = '00', pcc.CostCodeName , woa.AssemblyDescription) AssemblyDescription
 		from workorderassemblies woa
 		INNER JOIN dbo.Assemblies a	ON	woa.AssemblyNumber = a.AssemblyNumber	AND woa.AssemblyMod = a.AssemblyMod
-		LEFT JOIN dbo.ProjectCostCodes pcc	ON woa.ProjectCostCodeID = pcc.ProjectCostCodeID	AND pcc.Status	= 'on'		
+		INNER JOIN @ProjectCostCodes pcc	ON woa.ProjectCostCodeID = pcc.ProjectCostCodeID	--AND pcc.Status	= 'on'		
 		where woa.workorderid = @workorderid
 		and woa.workordermod = @workordermod
 		and pcc.CostCodeUniqueID = @CostCodeUniqueId
@@ -71,9 +96,9 @@ IF EXISTS (
 
 		union
 
-		select IIF(ba.AssemblyMod = '00', ISNULL(pcc.CostCodeName,ba.AssemblyDescription) , ba.AssemblyDescription) AssemblyDescription 
+		select IIF(ba.AssemblyMod = '00', pcc.CostCodeName , ba.AssemblyDescription) AssemblyDescription 
 		from buyoutassemblies  ba
-		INNER JOIN dbo.ProjectCostCodes pcc	ON ba.ProjectCostCodeID = pcc.ProjectCostCodeID	AND pcc.Status	= 'on'
+		INNER JOIN @ProjectCostCodes pcc	ON ba.ProjectCostCodeID = pcc.ProjectCostCodeID --	AND pcc.Status	= 'on'
 		where ba.workorderid = @workorderid
 		and ba.workordermod = @workordermod
 		and pcc.CostCodeUniqueID =@CostCodeUniqueId
@@ -90,10 +115,10 @@ BEGIN
 			select distinct '; ' + x.AssemblyDescription 
 			from (
 			
-				SELECT  IIF(woa.AssemblyMod = '00', ISNULL(pcc.CostCodeName,woa.AssemblyDescription) , woa.AssemblyDescription) AssemblyDescription
+				SELECT  IIF(woa.AssemblyMod = '00', pcc.CostCodeName , woa.AssemblyDescription) AssemblyDescription
 				from workorderassemblies woa
 				INNER JOIN dbo.Assemblies a	ON	woa.AssemblyNumber = a.AssemblyNumber	AND woa.AssemblyMod = a.AssemblyMod
-				LEFT JOIN dbo.ProjectCostCodes pcc	ON woa.ProjectCostCodeID = pcc.ProjectCostCodeID	AND pcc.Status	= 'on'		
+				inner JOIN @ProjectCostCodes pcc	ON woa.ProjectCostCodeID = pcc.ProjectCostCodeID	--AND pcc.Status	= 'on'		
 				where woa.workorderid = @workorderid
 				and woa.workordermod = @workordermod
 				and pcc.CostCodeUniqueID = @CostCodeUniqueId
@@ -101,9 +126,9 @@ BEGIN
 
 				union
 
-				select IIF(ba.AssemblyMod = '00', ISNULL(pcc.CostCodeName,ba.AssemblyDescription) , ba.AssemblyDescription) AssemblyDescription 
+				select IIF(ba.AssemblyMod = '00', pcc.CostCodeName , ba.AssemblyDescription) AssemblyDescription 
 				from buyoutassemblies  ba
-				INNER JOIN dbo.ProjectCostCodes pcc	ON ba.ProjectCostCodeID = pcc.ProjectCostCodeID	AND pcc.Status	= 'on'
+				INNER JOIN @ProjectCostCodes pcc	ON ba.ProjectCostCodeID = pcc.ProjectCostCodeID --	AND pcc.Status	= 'on'
 				where ba.workorderid = @workorderid
 				and ba.workordermod = @workordermod
 				and pcc.CostCodeUniqueID =@CostCodeUniqueId
@@ -121,15 +146,15 @@ ELSE
 BEGIN
 	
 	IF EXISTS (
-			select top 1 *
-			from ProjectCostCodes
+			select top 1 CostCodeName
+			from @ProjectCostCodes
 			where WorkorderID = @workorderid
 			and CostCodeUniqueID = @CostCodeUniqueID
 
 	)
 	begin
 		select @Str = CostCodeName
-		from ProjectCostCodes
+		from @ProjectCostCodes
 		where WorkorderID = @workorderid
 		and CostCodeUniqueID = @CostCodeUniqueID
 	end
@@ -153,4 +178,3 @@ END
 RETURN @Str
 
 END
-
